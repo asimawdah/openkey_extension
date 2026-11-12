@@ -296,13 +296,21 @@ async function handleRequest(msg: {
 injectPageScript();
 
 window.addEventListener("message", (event) => {
-  if (event.source !== window) return;
+  // This bridge receives messages from the page's MAIN world. Never trust an
+  // origin supplied inside event.data: page scripts can forge that field.
+  // The browser-controlled MessageEvent.origin is the authority here.
+  if (event.source !== window || event.origin !== location.origin) return;
+
   const data = event.data;
   if (!data || data.source !== SOURCE || data.type !== "request") return;
+  if (typeof data.id !== "string" || data.id.length > 128) return;
+  if (data.origin !== event.origin) return;
+  if (data.requestType !== "create" && data.requestType !== "get") return;
+
   void handleRequest({
-    id: String(data.id),
+    id: data.id,
     requestType: data.requestType,
     publicKey: data.publicKey,
-    origin: String(data.origin || location.origin),
+    origin: event.origin,
   });
 });
